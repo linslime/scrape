@@ -20,7 +20,7 @@ if __name__ == '__main__':
     print('完成读取本地图片url')
 
     print('开始创建进程池、线程池和监测线程')
-    process_pool = Pool(10)
+    process_pool = Pool(6)
     thread_pool = ThreadPoolExecutor(max_workers=30)
     print('完成创建进程池、线程池和监测线程')
 
@@ -63,10 +63,13 @@ if __name__ == '__main__':
         print('开始第' + str(num) + '轮检查')
     thread_pool.shutdown()
     print('通过第' + str(num) + '轮检查，图片下载完成')
+    if len(process_pool._cache) > 0:
+        print('还有章节pdf未处理完成')
     process_pool.close()
     process_pool.join()
     print('完成生成章节pdf')
 
-    print('开始生成总pdf')
-    create_aggregate_pdf(comics_name)
+    if not aggregate_pdf_exist:
+        print('开始生成总pdf')
+        create_aggregate_pdf(comics_name)
     print('完成生成总pdf')

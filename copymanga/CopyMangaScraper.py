@@ -109,6 +109,8 @@ def download_chapters(comics_name, image_urls, lock, chapter_index_list, images_
             return
         chapter_index = chapter_index_list[0]
         chapter_index_list[0] = chapter_index + 1
+        if not check_chapter_exist(images_exist, chapter_index):
+            print('开始下载章节' + get_string_name(chapter_index))
         lock.release()
 
         while not check_chapter_exist(images_exist, chapter_index):
