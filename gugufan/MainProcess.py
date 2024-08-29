@@ -33,8 +33,23 @@ def get_name_and_episodes(url):
     return cartoon_name, episode
 
 
+def get_episode_website(code, episode):
+    """
+    通过番剧的最新集数和番剧的代码获得番剧每一集的网址
+    :param episode: 番剧的最新集数
+    :param code: 番剧代码
+    :return: 每一集番剧的网址
+    """
+    websites = list()
+    for i in range(1, episode + 1):
+        website = "https://www.gugufan.org/index.php/vod/play/id/" + str(code) + "/sid/1/nid/" + str(i) + ".html"
+        websites.append(website)
+    return websites
+
+
 if __name__ == "__main__":
     code = 2738
     homepage_website = get_homepage_website(code)
-    get_name_and_episodes(homepage_website)
+    cartoon_name, episode = get_name_and_episodes(homepage_website)
+    websites = get_episode_website(episode, code)
     print(homepage_website)
