@@ -79,7 +79,10 @@ if __name__ == "__main__":
     homepage_website = get_homepage_website(code)
     cartoon_name, episode = get_name_and_episodes(homepage_website)
     websites = get_episode_website(code, episode)
-    m3u8_url, ts_part_url = get_m3u8_url(websites[0])
+    m3u8_url, ts_part_url = get_m3u8_url(websites[3])
     m3u8 = requests.get(url=m3u8_url, timeout=10).text
     index = re.findall(pattern="index.*.ts", string=m3u8)
+    ts_url = list()
+    for i in index:
+        ts_url.append('https://b19.yizhoushi.com/acgworld/videos/' + ts_part_url + '/' + i)
     print(m3u8)
