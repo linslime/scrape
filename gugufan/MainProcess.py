@@ -89,6 +89,22 @@ def get_ts_url(url):
     return ts_url
 
 
+def get_and_save_ts(url):
+    """
+    通过.ts网址，下载并保存.ts文件
+    :param url: .ts文件网址
+    :return: 是否成功
+    """
+    try:
+        ts = requests.get(url=url, timeout=10).content
+        with open('./data/' + url + '.ts', 'wb') as f:
+            f.write(ts)
+        return True
+    except:
+        print("haha")
+        return False
+
+
 if __name__ == "__main__":
     code = 2738
     homepage_website = get_homepage_website(code)
