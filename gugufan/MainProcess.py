@@ -61,7 +61,7 @@ def get_episode_website(code, episode):
     return websites
 
 
-def get_m3u8_url(url):
+def get_m3u8_and_ts_part_url(url):
     """
     通过一集番剧的网址，得到.m3u8文件的网址
     :param url:
@@ -74,15 +74,24 @@ def get_m3u8_url(url):
     return m3u8_url, ts_part_url
 
 
-if __name__ == "__main__":
-    code = 2738
-    homepage_website = get_homepage_website(code)
-    cartoon_name, episode = get_name_and_episodes(homepage_website)
-    websites = get_episode_website(code, episode)
-    m3u8_url, ts_part_url = get_m3u8_url(websites[3])
+def get_ts_url(url):
+    """
+    通过某一集url，得到所有.ts文件网址
+    :param url: 某一集url的网址
+    :return: 这一集所有.ts文件的网址
+    """
+    m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(url)
     m3u8 = requests.get(url=m3u8_url, timeout=10).text
     index = re.findall(pattern="index.*.ts", string=m3u8)
     ts_url = list()
     for i in index:
         ts_url.append('https://b19.yizhoushi.com/acgworld/videos/' + ts_part_url + '/' + i)
-    print(m3u8)
+    return ts_url
+
+
+if __name__ == "__main__":
+    code = 2738
+    homepage_website = get_homepage_website(code)
+    cartoon_name, episode = get_name_and_episodes(homepage_website)
+    websites = get_episode_website(code, episode)
+    m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(websites[3])
