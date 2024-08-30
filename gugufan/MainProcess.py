@@ -70,7 +70,8 @@ def get_m3u8_url(url):
     browser = get_browser('edge')
     browser.get(url)
     m3u8_url = "https://" + re.search(pattern="url_next\":\"(.*?)\"", string=browser.page_source).group(1)[10:].replace('\\', '/')
-    return m3u8_url
+    ts_part_url = re.findall(pattern="videos/(.*?)/index", string=browser.page_source)[0]
+    return m3u8_url, ts_part_url
 
 
 if __name__ == "__main__":
@@ -78,6 +79,7 @@ if __name__ == "__main__":
     homepage_website = get_homepage_website(code)
     cartoon_name, episode = get_name_and_episodes(homepage_website)
     websites = get_episode_website(code, episode)
-    m3u8_url = get_m3u8_url(websites[0])
+    m3u8_url, ts_part_url = get_m3u8_url(websites[0])
     m3u8 = requests.get(url=m3u8_url, timeout=10).text
+    index = re.findall(pattern="index.*.ts", string=m3u8)
     print(m3u8)
