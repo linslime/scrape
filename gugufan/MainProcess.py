@@ -89,19 +89,19 @@ def get_ts_url(url):
     return ts_url
 
 
-def get_and_save_ts(url):
+def get_and_save_ts(url, path):
     """
     通过.ts网址，下载并保存.ts文件
     :param url: .ts文件网址
+    :param path: .ts文件的目录
     :return: 是否成功
     """
     try:
         ts = requests.get(url=url, timeout=10).content
-        with open('./data/' + url + '.ts', 'wb') as f:
+        with open(path, 'wb') as f:
             f.write(ts)
         return True
     except:
-        print("haha")
         return False
 
 
