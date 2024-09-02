@@ -146,8 +146,8 @@ def get_task(code):
     task_list = list()
     for i in range(len(websites)):
         # 创建目录
-        if not os.path.exists('./cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/'):
-            os.makedirs('./cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/')
+        if not os.path.exists(Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/'):
+            os.makedirs(Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/')
         m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(websites[i])
         m3u8 = request(m3u8_url).text
         index_list = re.findall(pattern="index.*.ts", string=m3u8)
