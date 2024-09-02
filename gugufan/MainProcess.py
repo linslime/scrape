@@ -5,6 +5,7 @@ import re
 import requests
 import multiprocessing
 from Config import Config
+import os
 
 
 def get_homepage_website(code):
@@ -79,7 +80,11 @@ def get_m3u8_and_ts_part_url(url):
     return m3u8_url, ts_part_url
 
 
-def multi_process_download(queue):
+def multi_process_download(task):
+    # 创建队列
+    queue = multiprocessing.Manager().Queue()
+    for i in task:
+        queue.put(i)
     # 用与互斥访问队列
     lock = multiprocessing.Manager().Lock()
 
@@ -140,6 +145,9 @@ def get_task(code):
     # 创建任务队列
     task_list = list()
     for i in range(len(websites)):
+        # 创建目录
+        if not os.path.exists('./cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/'):
+            os.makedirs('./cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/')
         m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(websites[i])
         m3u8 = request(m3u8_url).text
         index_list = re.findall(pattern="index.*.ts", string=m3u8)
@@ -176,10 +184,7 @@ def main(code):
     # 创建任务共享队列，该队列由多个队列组成，每个队列都是某一集的.ts文件集合
     task_queue = multiprocessing.Manager().Queue()
     for task in task_list:
-        queue = multiprocessing.Manager().Queue()
-        for i in task:
-            queue.put(i)
-        task_queue.put(queue)
+        task_queue.put(task)
 
     # 锁，用于互斥访问task_queue
     lock = multiprocessing.Manager().Lock()
@@ -187,7 +192,7 @@ def main(code):
     # 多进程处理任务
     processes = list()
     for i in range(5):
-        process = multiprocessing.Process(target=run_download, args=(task_queue, lock))
+        process = multiprocessing.Process(target=complete_all_tasks, args=(task_queue, lock))
         process.start()
         processes.append(process)
     for process in processes:
