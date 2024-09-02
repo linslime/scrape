@@ -146,15 +146,15 @@ def get_task(code):
     task_list = list()
     for i in range(len(websites)):
         # 创建目录
-        if not os.path.exists(Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/'):
-            os.makedirs(Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/')
+        if not os.path.exists(Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1)):
+            os.makedirs(Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1))
         m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(websites[i])
         m3u8 = request(m3u8_url).text
         index_list = re.findall(pattern="index.*.ts", string=m3u8)
         ts_url = list()
         for index in index_list:
             url = 'https://b19.yizhoushi.com/acgworld/videos/' + ts_part_url + '/' + index
-            path = Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/' + index
+            path = Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1) + '/' + index
             ts_url.append((url, path))
         task_list.append(ts_url)
     return task_list
