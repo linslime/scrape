@@ -154,7 +154,7 @@ def get_task(code):
         ts_url = list()
         for index in index_list:
             url = 'https://b19.yizhoushi.com/acgworld/videos/' + ts_part_url + '/' + index
-            path = './cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/' + index
+            path = Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/' + index
             ts_url.append((url, path))
         task_list.append(ts_url)
     return task_list
