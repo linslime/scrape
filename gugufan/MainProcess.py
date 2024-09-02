@@ -1,7 +1,10 @@
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from parsel import Selector
 import re
 import requests
+import multiprocessing
+from Config import Config
 
 
 def get_homepage_website(code):
@@ -39,11 +42,12 @@ def get_name_and_episodes(url):
     cartoon_name:番剧的名字
     episode:番剧的最新集数
     """
-    browser = get_browser('edge')
+    browser = get_browser(Config.browser_type)
     browser.get(url)
     selector = Selector(browser.page_source)
     cartoon_name = selector.css('.slide-info-title *::text').get()
     episode = int(re.findall(r"\d+\.?\d*", selector.css('.slide-info-remarks *::text').get())[0])
+    browser.close()
     return cartoon_name, episode
 
 
@@ -67,47 +71,128 @@ def get_m3u8_and_ts_part_url(url):
     :param url:
     :return:
     """
-    browser = get_browser('edge')
+    browser = get_browser(Config.browser_type)
     browser.get(url)
-    m3u8_url = "https://" + re.search(pattern="url_next\":\"(.*?)\"", string=browser.page_source).group(1)[10:].replace('\\', '/')
+    m3u8_url = "https://" + re.search(pattern="1\",\"url\":\"(.*?)\",\"url_next", string=browser.page_source).group(1)[10:].replace('\\', '/')
     ts_part_url = re.findall(pattern="videos/(.*?)/index", string=browser.page_source)[0]
+    browser.close()
     return m3u8_url, ts_part_url
 
 
-def get_ts_url(url):
-    """
-    通过某一集url，得到所有.ts文件网址
-    :param url: 某一集url的网址
-    :return: 这一集所有.ts文件的网址
-    """
-    m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(url)
-    m3u8 = requests.get(url=m3u8_url, timeout=10).text
-    index = re.findall(pattern="index.*.ts", string=m3u8)
-    ts_url = list()
-    for i in index:
-        ts_url.append('https://b19.yizhoushi.com/acgworld/videos/' + ts_part_url + '/' + i)
-    return ts_url
+def multi_process_download(queue):
+    # 用与互斥访问队列
+    lock = multiprocessing.Manager().Lock()
+
+    # 多进程下载.ts文件
+    processes = list()
+    for i in range(5):
+        process = multiprocessing.Process(target=run_download, args=(queue, lock))
+        process.start()
+        processes.append(process)
+
+    for process in processes:
+        process.join()
 
 
-def get_and_save_ts(url, path):
+def run_download(queue, lock):
+    while True:
+        lock.acquire()
+        if not queue.empty():
+            url, path = queue.get()
+            lock.release()
+            ts = request(url).content
+            with open(path, 'wb') as f:
+                f.write(ts)
+        else:
+            lock.release()
+            break
+
+
+def request(url):
     """
-    通过.ts网址，下载并保存.ts文件
-    :param url: .ts文件网址
-    :param path: .ts文件的目录
-    :return: 是否成功
+    通过url下载文件，如果下载失败则重试
+    :param url: 文件网址
+    :return: 文件
     """
-    try:
-        ts = requests.get(url=url, timeout=10).content
-        with open(path, 'wb') as f:
-            f.write(ts)
-        return True
-    except:
-        return False
+    response = None
+    while True:
+        try:
+            response = requests.get(url=url, timeout=10)
+            break
+        except:
+            continue
+    return response
+
+
+def get_task(code):
+    """
+    通过动漫代码得到任务列表
+    :param code:动漫代码
+    :return: 任务列表
+    """
+
+    # 得到动漫主页网址
+    homepage_website = get_homepage_website(code)
+    # 得到动漫名字和集数
+    cartoon_name, episode = get_name_and_episodes(homepage_website)
+    # 通过动漫代码和集数，得到每一集动漫的网址
+    websites = get_episode_website(code, episode)
+    # 创建任务队列
+    task_list = list()
+    for i in range(len(websites)):
+        m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(websites[i])
+        m3u8 = request(m3u8_url).text
+        index_list = re.findall(pattern="index.*.ts", string=m3u8)
+        ts_url = list()
+        for index in index_list:
+            url = 'https://b19.yizhoushi.com/acgworld/videos/' + ts_part_url + '/' + index
+            path = './cartoon/' + cartoon_name + '/' + str(i + 1) + '/temp/' + index
+            ts_url.append((url, path))
+        task_list.append(ts_url)
+    return task_list
+
+
+def complete_all_tasks(task_queue, lock):
+    """
+    多进程下载多集动漫
+    :param task_queue:任务队列
+    :param lock: 锁
+    :return:
+    """
+    while True:
+        lock.acquire()
+        if not task_queue.empty():
+            task = task_queue.get()
+            lock.release()
+            multi_process_download(task)
+        else:
+            lock.release()
+            break
+
+
+def main(code):
+    # 获得任务队列
+    task_list = get_task(code)
+    # 创建任务共享队列，该队列由多个队列组成，每个队列都是某一集的.ts文件集合
+    task_queue = multiprocessing.Manager().Queue()
+    for task in task_list:
+        queue = multiprocessing.Manager().Queue()
+        for i in task:
+            queue.put(i)
+        task_queue.put(queue)
+
+    # 锁，用于互斥访问task_queue
+    lock = multiprocessing.Manager().Lock()
+
+    # 多进程处理任务
+    processes = list()
+    for i in range(5):
+        process = multiprocessing.Process(target=run_download, args=(task_queue, lock))
+        process.start()
+        processes.append(process)
+    for process in processes:
+        process.join()
 
 
 if __name__ == "__main__":
-    code = 2738
-    homepage_website = get_homepage_website(code)
-    cartoon_name, episode = get_name_and_episodes(homepage_website)
-    websites = get_episode_website(code, episode)
-    m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(websites[3])
+    main(Config.code)
