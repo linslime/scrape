@@ -88,7 +88,7 @@ def multi_process_download(task):
 
     # 多进程下载.ts文件
     processes = list()
-    for i in range(30):
+    for i in range(Config.max_downloads):
         process = multiprocessing.Process(target=run_download, args=(queue, lock))
         process.start()
         processes.append(process)
@@ -242,7 +242,7 @@ def main(code):
 
     # 多进程处理任务
     processes = list()
-    for i in range(5):
+    for i in range(Config.max_episodes):
         process = multiprocessing.Process(target=complete_all_tasks, args=(task_queue, lock))
         process.start()
         processes.append(process)
