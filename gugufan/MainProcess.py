@@ -1,9 +1,11 @@
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from parsel import Selector
 import re
 import requests
 import multiprocessing
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 from Config import Config
 import os
 
@@ -14,7 +16,7 @@ def get_homepage_website(code):
     :param code:番剧的代码
     :return: 番剧主页的网址
     """
-    return "https://www.gugufan.org/index.php/vod/detail/id/" + str(code) + ".html"
+    return Config.main_page + "/index.php/vod/detail/id/" + str(code) + ".html"
 
 
 def get_browser(type):
@@ -35,42 +37,32 @@ def get_browser(type):
         return browser
 
 
-def get_name_and_episodes(url):
+def get_message(url):
     """
     通过番剧主页地址，获得番剧的名字和最新集数
     :param url:番剧主页的网址
     :return:
     cartoon_name:番剧的名字
-    episode:番剧的最新集数
+    episode_name:番剧每一集的名字
+    episode_website:番剧每一集的网址
     """
     browser = get_browser(Config.browser_type)
     browser.get(url)
+    WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'rel')))
     selector = Selector(browser.page_source)
     cartoon_name = selector.css('.slide-info-title *::text').get()
-    episode = int(re.findall(r"\d+\.?\d*", selector.css('.slide-info-remarks *::text').get())[0])
+    episode_website = selector.css('.anthology-list-play')[0].css('a::attr(href)').getall()
+    episode_website = [Config.main_page + i for i in episode_website]
+    episode_name = selector.css('.anthology-list-play')[0].css('*::text').getall()
     browser.close()
-    return cartoon_name, episode
-
-
-def get_episode_website(code, episode):
-    """
-    通过番剧的最新集数和番剧的代码获得番剧每一集的网址
-    :param episode: 番剧的最新集数
-    :param code: 番剧代码
-    :return: 每一集番剧的网址
-    """
-    websites = list()
-    for i in range(1, episode + 1):
-        website = "https://www.gugufan.org/index.php/vod/play/id/" + str(code) + "/sid/1/nid/" + str(i) + ".html"
-        websites.append(website)
-    return websites
+    return cartoon_name, episode_name, episode_website
 
 
 def get_m3u8_and_ts_part_url(url):
     """
     通过一集番剧的网址，得到.m3u8文件的网址
-    :param url:
-    :return:
+    :param url:该集番剧的网址
+    :return:m3u8_url文件的网址，.ts文件url的一部分
     """
     browser = get_browser(Config.browser_type)
     browser.get(url)
@@ -81,6 +73,11 @@ def get_m3u8_and_ts_part_url(url):
 
 
 def multi_process_download(task):
+    """
+    下载一集番剧的全部.ts文件
+    :param task: 该集番剧的任务队列
+    :return:
+    """
     # 创建队列
     queue = multiprocessing.Manager().Queue()
     for i in task:
@@ -90,7 +87,7 @@ def multi_process_download(task):
 
     # 多进程下载.ts文件
     processes = list()
-    for i in range(5):
+    for i in range(30):
         process = multiprocessing.Process(target=run_download, args=(queue, lock))
         process.start()
         processes.append(process)
@@ -100,6 +97,12 @@ def multi_process_download(task):
 
 
 def run_download(queue, lock):
+    """
+    下载.ts文件，并保存
+    :param queue: 任务队列
+    :param lock: 锁，用于互斥访问queue
+    :return: None
+    """
     while True:
         lock.acquire()
         if not queue.empty():
@@ -129,6 +132,30 @@ def request(url):
     return response
 
 
+def download_m3u8(cartoon_name, name, website, results):
+    """
+    为某一集创建任务
+    :param cartoon_name:动画名字
+    :param name:某一集的名字
+    :param website:某一集的url
+    :param results:结果队列，是共享队列
+    :return:
+    """
+    # 创建目录
+    dirs = Config.save_path + '/cartoon/' + cartoon_name + '/' + name
+    if not os.path.exists(dirs):
+        os.makedirs(dirs)
+    m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(website)
+    m3u8 = request(m3u8_url).text
+    index_list = re.findall(pattern="index.*.ts", string=m3u8)
+    ts_url = list()
+    for index in index_list:
+        url = 'https://b19.yizhoushi.com/acgworld/videos/' + ts_part_url + '/' + index
+        path = dirs + '/' + index
+        ts_url.append((url, path))
+    results.put(ts_url)
+
+
 def get_task(code):
     """
     通过动漫代码得到任务列表
@@ -139,25 +166,19 @@ def get_task(code):
     # 得到动漫主页网址
     homepage_website = get_homepage_website(code)
     # 得到动漫名字和集数
-    cartoon_name, episode = get_name_and_episodes(homepage_website)
-    # 通过动漫代码和集数，得到每一集动漫的网址
-    websites = get_episode_website(code, episode)
-    # 创建任务队列
-    task_list = list()
-    for i in range(len(websites)):
-        # 创建目录
-        if not os.path.exists(Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1)):
-            os.makedirs(Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1))
-        m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(websites[i])
-        m3u8 = request(m3u8_url).text
-        index_list = re.findall(pattern="index.*.ts", string=m3u8)
-        ts_url = list()
-        for index in index_list:
-            url = 'https://b19.yizhoushi.com/acgworld/videos/' + ts_part_url + '/' + index
-            path = Config.save_path + '/cartoon/' + cartoon_name + '/' + str(i + 1) + '/' + index
-            ts_url.append((url, path))
-        task_list.append(ts_url)
-    return task_list
+    cartoon_name, episode_name, episode_website = get_message(homepage_website)
+    # 创建结果队列
+    task_queue = multiprocessing.Manager().Queue()
+    # 创建多进程处理任务
+    processes = []
+    for i in range(len(episode_website)):
+        process = multiprocessing.Process(target=download_m3u8, args=(cartoon_name, episode_name[i], episode_website[i], task_queue))
+        process.start()
+        processes.append(process)
+    # 等待多进程完成任务
+    for process in processes:
+        process.join()
+    return task_queue
 
 
 def complete_all_tasks(task_queue, lock):
@@ -178,13 +199,12 @@ def complete_all_tasks(task_queue, lock):
             break
 
 
+# def merge_ts_files():
+
+
 def main(code):
     # 获得任务队列
-    task_list = get_task(code)
-    # 创建任务共享队列，该队列由多个队列组成，每个队列都是某一集的.ts文件集合
-    task_queue = multiprocessing.Manager().Queue()
-    for task in task_list:
-        task_queue.put(task)
+    task_queue = get_task(code)
 
     # 锁，用于互斥访问task_queue
     lock = multiprocessing.Manager().Lock()
@@ -195,6 +215,7 @@ def main(code):
         process = multiprocessing.Process(target=complete_all_tasks, args=(task_queue, lock))
         process.start()
         processes.append(process)
+    # 等待任务完成
     for process in processes:
         process.join()
 
