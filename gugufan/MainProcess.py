@@ -7,17 +7,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from Config import Config
+from Config import Path
 import os
 import shutil
-
-
-def get_homepage_website(code):
-    """
-    通过番剧的代码得到番剧主页的网址
-    :param code:番剧的代码
-    :return: 番剧主页的网址
-    """
-    return Config.main_page + "/index.php/vod/detail/id/" + str(code) + ".html"
 
 
 def get_browser(type):
@@ -52,11 +44,12 @@ def get_message(url):
     WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'rel')))
     selector = Selector(browser.page_source)
     cartoon_name = selector.css('.slide-info-title *::text').get()
+    Path.cartoon_name = cartoon_name
     episode_website = selector.css('.anthology-list-play')[0].css('a::attr(href)').getall()
     episode_website = [Config.main_page + i for i in episode_website]
     episode_name = selector.css('.anthology-list-play')[0].css('*::text').getall()
     browser.close()
-    return cartoon_name, episode_name, episode_website
+    return episode_name, episode_website
 
 
 def get_m3u8_and_ts_part_url(url):
@@ -133,17 +126,16 @@ def request(url):
     return response
 
 
-def download_m3u8(cartoon_name, name, website, results):
+def download_m3u8(name, website, results):
     """
     为某一集创建任务
-    :param cartoon_name:动画名字
     :param name:某一集的名字
     :param website:某一集的url
     :param results:结果队列，是共享队列
     :return:
     """
     # 创建目录
-    dirs = Config.save_path + '/cartoon/' + cartoon_name + '/' + name + '/temp'
+    dirs = Path.get_ts_folder_path(name=name)
     if not os.path.exists(dirs):
         os.makedirs(dirs)
     m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(website)
@@ -151,8 +143,8 @@ def download_m3u8(cartoon_name, name, website, results):
     index_list = re.findall(pattern="index.*.ts", string=m3u8)
     ts_url = list()
     for index in index_list:
-        url = 'https://b19.yizhoushi.com/acgworld/videos/' + ts_part_url + '/' + index
-        path = dirs + '/' + index
+        url = Path.get_ts_url(ts_part_url=ts_part_url, index=index)
+        path = Path.get_ts_file_path(name=name, index=index)
         ts_url.append((url, path))
     results.put(ts_url)
 
@@ -165,15 +157,15 @@ def get_task(code):
     """
 
     # 得到动漫主页网址
-    homepage_website = get_homepage_website(code)
+    homepage_website = Path.get_homepage_website(code)
     # 得到动漫名字和集数
-    cartoon_name, episode_name, episode_website = get_message(homepage_website)
+    episode_name, episode_website = get_message(homepage_website)
     # 创建结果队列
     task_queue = multiprocessing.Manager().Queue()
     # 创建多进程处理任务
     processes = []
     for i in range(len(episode_website)):
-        process = multiprocessing.Process(target=download_m3u8, args=(cartoon_name, episode_name[i], episode_website[i], task_queue))
+        process = multiprocessing.Process(target=download_m3u8, args=(episode_name[i], episode_website[i], task_queue))
         process.start()
         processes.append(process)
     # 等待多进程完成任务
@@ -206,21 +198,16 @@ def merge_ts_files(code):
     :param code: 番剧代码
     :return:
     """
-    browser = get_browser(Config.browser_type)
-    browser.get(get_homepage_website(code))
-    WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'rel')))
-    selector = Selector(browser.page_source)
-    cartoon_name = selector.css('.slide-info-title *::text').get()
-    dirs = Config.save_path + '/cartoon/' + cartoon_name + '/temp'
+    dirs = Path.get_temp_folder_path()
     if not os.path.exists(dirs):
         return
     episodes = os.listdir(dirs)
     for episode in episodes:
-        episode_path = os.path.join(dirs, episode)
+        episode_path = Path.get_ts_folder_path(episode)
         ts_list = sorted(os.listdir(episode_path), key=lambda s: int(re.findall('\d+', s)[0]))
-        mp4 = open(os.path.join(Config.save_path + '/cartoon/' + cartoon_name, episode) + '.mp4', 'ab')
+        mp4 = open(Path.get_mp4_path(episode=episode), 'ab')
         for ts in ts_list:
-            ts_path = os.path.join(episode_path, ts)
+            ts_path = Path.get_ts_file_path(episode, ts)
             ts_file = open(ts_path, 'rb')
             mp4.write(ts_file.read())
             ts_file.close()
