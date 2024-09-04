@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from Config import Config
 import os
+import shutil
 
 
 def get_homepage_website(code):
@@ -142,7 +143,7 @@ def download_m3u8(cartoon_name, name, website, results):
     :return:
     """
     # 创建目录
-    dirs = Config.save_path + '/cartoon/' + cartoon_name + '/' + name
+    dirs = Config.save_path + '/cartoon/' + cartoon_name + '/' + name + '/temp'
     if not os.path.exists(dirs):
         os.makedirs(dirs)
     m3u8_url, ts_part_url = get_m3u8_and_ts_part_url(website)
@@ -199,10 +200,40 @@ def complete_all_tasks(task_queue, lock):
             break
 
 
-# def merge_ts_files():
+def merge_ts_files(code):
+    """
+    合并文件，并删除文件
+    :param code: 番剧代码
+    :return:
+    """
+    browser = get_browser(Config.browser_type)
+    browser.get(get_homepage_website(code))
+    WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'rel')))
+    selector = Selector(browser.page_source)
+    cartoon_name = selector.css('.slide-info-title *::text').get()
+    dirs = Config.save_path + '/cartoon/' + cartoon_name + '/temp'
+    if not os.path.exists(dirs):
+        return
+    episodes = os.listdir(dirs)
+    for episode in episodes:
+        episode_path = os.path.join(dirs, episode)
+        ts_list = sorted(os.listdir(episode_path), key=lambda s: int(re.findall('\d+', s)[0]))
+        mp4 = open(os.path.join(Config.save_path + '/cartoon/' + cartoon_name, episode) + '.mp4', 'ab')
+        for ts in ts_list:
+            ts_path = os.path.join(episode_path, ts)
+            ts_file = open(ts_path, 'rb')
+            mp4.write(ts_file.read())
+            ts_file.close()
+        mp4.close()
+    shutil.rmtree(dirs)
 
 
 def main(code):
+    """
+    主函数
+    :param code:番剧代码
+    :return:
+    """
     # 获得任务队列
     task_queue = get_task(code)
 
@@ -218,6 +249,8 @@ def main(code):
     # 等待任务完成
     for process in processes:
         process.join()
+    # 合并文件，生成mp4文件，并删除.ts文件
+    merge_ts_files(code)
 
 
 if __name__ == "__main__":
