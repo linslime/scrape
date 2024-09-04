@@ -145,7 +145,9 @@ def download_m3u8(name, website, results):
     for index in index_list:
         url = Path.get_ts_url(ts_part_url=ts_part_url, index=index)
         path = Path.get_ts_file_path(name=name, index=index)
-        ts_url.append((url, path))
+        # 判断该.ts文件是否已经下载完成
+        if not os.path.exists(path):
+            ts_url.append((url, path))
     results.put(ts_url)
 
 
@@ -203,6 +205,9 @@ def merge_ts_files(code):
         return
     episodes = os.listdir(dirs)
     for episode in episodes:
+        # 若该mp4文件已经生成完成，则跳过
+        if os.path.exists(Path.get_mp4_path(episode=episode)):
+            continue
         episode_path = Path.get_ts_folder_path(episode)
         ts_list = sorted(os.listdir(episode_path), key=lambda s: int(re.findall('\d+', s)[0]))
         mp4 = open(Path.get_mp4_path(episode=episode), 'ab')
