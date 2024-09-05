@@ -3,6 +3,7 @@ import pickle
 from Config import Config
 import multiprocessing
 import select
+import time
 
 
 class Data:
@@ -148,17 +149,45 @@ class Client:
         self.client.close()
 
 
+def manager_test():
+    queue = multiprocessing.Manager().Queue()
+    str = 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh'
+    list = [str for i in range(10000)]
+    start = time.time()
+    for i in list:
+        queue.put(i)
+    end = time.time()
+    print(end - start)
+
+    start = time.time()
+    for i in list:
+        value = queue.get()
+    end = time.time()
+    print(end - start)
+
+
+def socket_test():
+    ip, port = Config.SOCKET_IP
+    client = Client(ip, port)
+    str = 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh'
+    list = [str for i in range(10000)]
+    start = time.time()
+    for i in list:
+        client.queue_put("key", value=i)
+    end = time.time()
+    print(end - start)
+
+    start = time.time()
+    for i in list:
+        value = client.queue_get("key")
+    end = time.time()
+    print(end - start)
+
+
 if __name__ == '__main__':
     server = Server()
     process = multiprocessing.Process(target=server.start_server_socket, args=())
     process.start()
 
-    processes = list()
-    for i in range(10):
-        process = multiprocessing.Process(target=start_client_socket, args=())
-        processes.append(process)
-    for process in processes:
-        process.start()
-
-    for process in processes:
-        process.join()
+    manager_test()
+    socket_test()
