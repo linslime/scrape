@@ -107,21 +107,45 @@ class Server:
         self.queue[key].append(value)
 
 
-def start_client_socket():
-    """
-    启动客户端UDP Socket
-    :return:
-    """
-    ip, port = Config.SOCKET_IP
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # 使用TCP方式传输
-    client.connect((ip, port))  # 连接远程服务端
-    data = [i for i in range(10000)]
-    data = pickle.dumps(data)
-    # 与服务端交互
-    for i in range(1000):
-        client.sendto(data, Config.SOCKET_IP)  # 使用sendto发送UDP消息，address填入服务端IP和端口
-        socket_data = client.recv(Config.BUFFER_SIZE)
-    client.close()
+class Client:
+    def __init__(self, ip, port):
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # 使用TCP方式传输
+        client.connect((ip, port))  # 连接远程服务端
+        self.client = client
+
+    def get_data(self, key):
+        data = Data(Data.GET, key)
+        result = self.__request(data)
+        return result
+
+    def set_data(self, key, value):
+        data = Data(Data.SET, key, value)
+        result = self.__request(data)
+        return result
+
+    def del_data(self, key):
+        data = Data(Data.DEL, key)
+        result = self.__request(data)
+        return result
+
+    def queue_get(self, key):
+        data = Data(Data.QUEUE_GET, key)
+        result = self.__request(data)
+        return result
+
+    def queue_put(self, key, value):
+        data = Data(Data.QUEUE_PUT, key, value)
+        result = self.__request(data)
+        return result
+
+    def __request(self, data):
+        data = pickle.dumps(data)
+        self.client.sendto(data, Config.SOCKET_IP)  # 使用sendto发送UDP消息，address填入服务端IP和端口
+        result = self.client.recv(Config.BUFFER_SIZE)
+        return pickle.loads(result)
+
+    def close(self):
+        self.client.close()
 
 
 if __name__ == '__main__':
