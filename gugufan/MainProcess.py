@@ -6,10 +6,11 @@ import multiprocessing
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
-from Config import Config
-from Config import Path
+from gugufan.Config import Config
+from gugufan.Config import Path
 import os
 import shutil
+from miniredis.miniredis import create_shared_memory
 
 
 def get_browser(type):
@@ -44,7 +45,10 @@ def get_message(url):
     WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'rel')))
     selector = Selector(browser.page_source)
     cartoon_name = selector.css('.slide-info-title *::text').get()
-    Path.cartoon_name = cartoon_name
+    # 将动画名放入共享内存
+    shared_memory = create_shared_memory()
+    shared_memory.set_data('cartoon_name', cartoon_name)
+    shared_memory.close()
     episode_website = selector.css('.anthology-list-play')[0].css('a::attr(href)').getall()
     episode_website = [Config.main_page + i for i in episode_website]
     episode_name = selector.css('.anthology-list-play')[0].css('*::text').getall()

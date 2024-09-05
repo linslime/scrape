@@ -1,9 +1,8 @@
 import socket
 import pickle
-from Config import Config
+from .Config import Config
 import multiprocessing
 import select
-import time
 
 
 class Data:

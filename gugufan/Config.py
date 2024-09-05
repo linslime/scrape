@@ -1,8 +1,10 @@
+from miniredis.miniredis import create_shared_memory
+
+
 class Config:
     browser_type = 'chrome'
     save_path = 'D:/Desktop'
     code = 437
-    cartoon_name = '尸体派对OVA：被暴虐的灵魂的咒叫'
     main_page = 'https://www.gugu3.com'
     max_episodes = 8
     max_downloads = 10
@@ -44,5 +46,6 @@ class Path:
     @staticmethod
     def get_cartoon_name():
         if Path.cartoon_name is None:
-            Path.cartoon_name = Config.cartoon_name
+            shared_memory = create_shared_memory()
+            Path.cartoon_name = shared_memory.get_data('cartoon_name')
         return Path.cartoon_name
