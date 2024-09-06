@@ -48,4 +48,5 @@ class Path:
         if Path.cartoon_name is None:
             shared_memory = create_shared_memory()
             Path.cartoon_name = shared_memory.get_data('cartoon_name')
+            shared_memory.close()
         return Path.cartoon_name
